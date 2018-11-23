@@ -87,7 +87,7 @@ def main(file):
         DataSec = TotSec - (BPB_RsvdSecCnt + (BPB_NumFATs * FATSz) + RootDirSectors)        
         CountOfClusters = m.floor(DataSec / BPB_SecPerClus)
         
-        #1 FAT12, 2 FAT16, 3 FAT32
+        
         if CountOfClusters < 4085:
             FATType = 1
             FATTypes = "FAT12"
@@ -98,7 +98,6 @@ def main(file):
             FATType = 3
             FATTypes = "FAT32"
 
-            fat32((firstSectorOfCluster(BPB_RootClus, BPB_SecPerClus, FirstDataSector)) * BPB_BytesPerSec, f, CountOfClusters * BPB_SecPerClus * BPB_BytesPerSec)
         ClusterSize = BPB_BytesPerSec * BPB_SecPerClus
         
         f.close()
@@ -117,12 +116,5 @@ FAT type: {}""".format(OEMName, BPB_BytesPerSec, BPB_SecPerClus, ClusterSize, BP
         
 def firstSectorOfCluster(n, secPerCluster, firstDataSector):
     return ((n - 2) * secPerCluster) + firstDataSector
-
-def fat32(root, f, fs):
-    print(root, fs)
-    while root <= fs:
-        f.seek(root)
-        print(f.read(11))
-        root = root + 64
     
 main("/dev/sdb1")
