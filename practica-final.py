@@ -6,35 +6,29 @@ def main(file):
     with open(file, 'rb') as f:
         f.seek(3)
         OEMName = str(f.read(8))
-        
-        f.seek(11)
+
         byte1 = f.read(1)
         byte2 = f.read(1)
         byte = byte2 + byte1
         BPB_BytesPerSec = int(ba.hexlify(byte), 16)
         
-        f.seek(13)
         byte = f.read(1)
         BPB_SecPerClus = int(ba.hexlify(byte), 16)
         
-        f.seek(14)
         byte1 = f.read(1)
         byte2 = f.read(1)
         byte = byte2 + byte1
         BPB_RsvdSecCnt = int(ba.hexlify(byte), 16)
         
-        f.seek(16)
         byte = f.read(1)
         BPB_NumFATs = ba.hexlify(byte)
         BPB_NumFATs = int(BPB_NumFATs, 16)
         
-        f.seek(17)
         byte1 = f.read(1)
         byte2 = f.read(1)
         byte = byte2 + byte1
         BPB_RootEntCnt = int(ba.hexlify(byte), 16)
 
-        f.seek(19)
         byte1 = f.read(1)
         byte2 = f.read(1)
         byte = byte2 + byte1
@@ -53,8 +47,7 @@ def main(file):
         byte4 = f.read(1)
         byte = byte4 + byte3 + byte2 + byte1
         BPB_TotSec32 = int(ba.hexlify(byte), 16)
-
-        f.seek(36)
+        
         byte1 = f.read(1)
         byte2 = f.read(1)
         byte3 = f.read(1)
@@ -100,8 +93,6 @@ def main(file):
 
         ClusterSize = BPB_BytesPerSec * BPB_SecPerClus
         
-        f.close()
-        
         print("""OEM Name: {}
 Bytes Per Sector: {}
 Sectors Per Cluster: {}
@@ -112,9 +103,91 @@ Number Of Sectors: {}
 FAT Size: {}
 NumberOfClusters: {}
 FAT type: {}""".format(OEMName, BPB_BytesPerSec, BPB_SecPerClus, ClusterSize, BPB_RsvdSecCnt, BPB_NumFATs, TotSec, FATSz, CountOfClusters, FATTypes))
+        fileList(FirstDataSector * BPB_BytesPerSec, f)
+        f.close()
         
-        
+
 def firstSectorOfCluster(n, secPerCluster, firstDataSector):
     return ((n - 2) * secPerCluster) + firstDataSector
+
+
+def fileList(offset, f):
+    f.seek(offset)
+    print("Volume name: {}".format(f.read(11)))
+    print("**********************************")
+    print("Files")
+
+    check1 = 10
+    check2 = 10
+          
+    while check1 != 0:
+        if check1 != 229:
+            if check1 >= 64 and check1 < 80 and check2 == 15:
+                offset = searchLongEntry(offset, f)
+            else:
+                offset += 32
+            f.seek(offset)
+            check1 = int(ba.hexlify(f.read(1)), 16)
+            
+            f.seek(offset + 11)
+            check2 = int(ba.hexlify(f.read(1)), 16)
+        else:
+            offset += 32
+            f.seek(offset)
+
+            check1 = int(ba.hexlify(f.read(1)), 16)
+
+            f.seek(offset + 11)
+            check2 = int(ba.hexlify(f.read(1)), 16)
+    print("**********************************")
+    
+def searchLongEntry(offset, f):
+    fullName = []
+    string, offset, check1, check2 = LDIR_Name(offset, f)
+    fullName.append(string)
+    
+    while check1 < 32 and check2 == 15:
+        string, offset, check1, check2 = LDIR_Name(offset, f)
+        fullName.append(string)
+    fullName = ''.join(reversed(fullName))
+
+    print(fullName)
+    return offset
+
+def LDIR_Name(offset, f):
+    offset+=1
+    f.seek(offset)
+    
+    string1 = f.read(10)
+    string1 = cleanStr(string1)
+    
+    offset += 13
+    f.seek(offset)
+    
+    string2 = f.read(12)
+    string2 = cleanStr(string2)
+
+    offset += 14
+    f.seek(offset)
+
+    string3 = f.read(4)
+    string3 = cleanStr(string3)
+
+    offset += 4
+    
+    check1 = int(ba.hexlify(f.read(1)), 16)
+
+    f.seek(offset + 11)
+
+    check2 = int(ba.hexlify(f.read(1)), 16)
+    
+    string = string1 + string2 + string3
+
+    return string, offset, check1, check2
+
+def cleanStr(string):
+    string = [chr(c) for c in list(string) if c!=0 and c!=255]
+    string = ''.join(string)
+    return string
     
 main("/dev/sdb1")
