@@ -1,6 +1,6 @@
 import binascii as ba
 import math as m
-
+import sys
 
 bytespersector = 0
 sectorpercluster = 0
@@ -227,5 +227,6 @@ def cleanStr(string):
     string = [chr(c) for c in list(string) if c!=0 and c!=255]
     string = ''.join(string)
     return string
-    
-main("/dev/sdb1")
+
+
+main(sys.argv[1])
