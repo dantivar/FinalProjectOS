@@ -2,7 +2,15 @@ import binascii as ba
 import math as m
 
 
+bytespersector = 0
+sectorpercluster = 0
+firstdatasector = 0
+
 def main(file):
+    global bytespersector
+    global sectorpercluster
+    global firstdatasector
+    
     with open(file, 'rb') as f:
         f.seek(3)
         OEMName = str(f.read(8))
@@ -11,9 +19,11 @@ def main(file):
         byte2 = f.read(1)
         byte = byte2 + byte1
         BPB_BytesPerSec = int(ba.hexlify(byte), 16)
+        bytespersector = BPB_BytesPerSec
         
         byte = f.read(1)
         BPB_SecPerClus = int(ba.hexlify(byte), 16)
+        sectorpercluster = BPB_SecPerClus
         
         byte1 = f.read(1)
         byte2 = f.read(1)
@@ -71,7 +81,8 @@ def main(file):
             FATSz = BPB_FATSz32
 
         FirstDataSector = BPB_RsvdSecCnt + (BPB_NumFATs * FATSz) + RootDirSectors
-
+        firstdatasector = FirstDataSector
+        
         if  BPB_TotSec16 != 0:
             TotSec = BPB_TotSec16
         else:
@@ -116,14 +127,19 @@ def fileList(offset, f):
     print("Volume name: {}".format(f.read(11)))
     print("**********************************")
     print("Files")
+    
+    fileListD(offset, f)
+    print("**********************************")
 
+def fileListD(offset, f, depth = 1):
+   
     check1 = 10
     check2 = 10
           
     while check1 != 0:
         if check1 != 229:
             if check1 >= 64 and check1 < 80 and check2 == 15:
-                offset = searchLongEntry(offset, f)
+                offset = searchLongEntry(offset, f, depth)
             else:
                 offset += 32
             f.seek(offset)
@@ -139,9 +155,9 @@ def fileList(offset, f):
 
             f.seek(offset + 11)
             check2 = int(ba.hexlify(f.read(1)), 16)
-    print("**********************************")
+     
     
-def searchLongEntry(offset, f):
+def searchLongEntry(offset, f, depth):
     fullName = []
     string, offset, check1, check2 = LDIR_Name(offset, f)
     fullName.append(string)
@@ -149,11 +165,33 @@ def searchLongEntry(offset, f):
     while check1 < 32 and check2 == 15:
         string, offset, check1, check2 = LDIR_Name(offset, f)
         fullName.append(string)
-    fullName = ''.join(reversed(fullName))
 
-    print(fullName)
+    fullName = ''.join(reversed(fullName))
+    
+    temp = (' ' * (depth *3)) + '|--'
+    print(temp + fullName)
+    
+    if check2 == 16:
+        temp = 32 + (firstSectorOfCluster(getNextCluster(offset, f), sectorpercluster, firstdatasector) * bytespersector)
+        fileListD(temp, f, depth +1)
     return offset
 
+def getNextCluster(offset, f):
+    f.seek(offset + 20)
+    byte1 = f.read(1)
+    byte2 = f.read(1)
+    
+    byte = byte2 + byte1
+
+    f.seek(offset + 26)
+
+    byte1 = f.read(1)
+    byte2 = f.read(1)
+
+    byte = byte  + byte2 + byte1
+
+    return int(ba.hexlify(byte), 16)
+    
 def LDIR_Name(offset, f):
     offset+=1
     f.seek(offset)
